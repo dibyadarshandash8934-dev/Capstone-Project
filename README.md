@@ -1,4 +1,4 @@
-# VNS — Virtual NAT Gateway Simulator (C++)
+# Virtual NAT and Port Forward Simulator (C++)
 
 A self-contained, interactive simulator of a **virtual NAT gateway**: it
 performs SNAT/PAT address translation, DNAT (port forwarding), connection
