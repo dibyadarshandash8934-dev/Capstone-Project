@@ -1,90 +1,87 @@
-Virtual NAT Gateway & Port Forwarding Simulator
 
-A simple C++20-based Virtual NAT Gateway Simulator that demonstrates how NAT works in a private network.
 
-The project simulates SNAT/PAT, DNAT, Port Forwarding, Packet Processing, Connection Tracking, and NAT Tables through an interactive CLI.
-
-Note: This is a simulation. It does not send or intercept real network packets.
-
-⸻
-
-🚀 Main Features
-
-* 🌐 Virtual Network Configuration
-* 💻 Virtual Host Management
-* 🔄 SNAT / PAT
-* 🔀 DNAT / Port Forwarding
-* 📦 Packet Simulation
-* 🔗 Connection Tracking
-* 📊 NAT Translation Table
-* 📈 Simulation Metrics
-* 🖥️ Interactive CLI
-* 🐧 Linux Kernel Driver Interface
-
-⸻
-
-🔄 How NAT Works
-
-Outbound Traffic — SNAT/PAT
-
-A private device sends a packet to the Internet:
+#  Virtual NAT Gateway & Port Forwarding Simulator
+A **C++20-based Virtual NAT Gateway Simulator** that demonstrates how Network Address Translation works inside a private network.
+The project simulates:
+**SNAT/PAT • DNAT • Port Forwarding • Packet Processing • Connection Tracking • NAT Tables**
+> **Note:** This is a simulation. It does not send or intercept real network packets.
+---
+#  Key Features
+### 🌐 Virtual Network
+Configure a private network using a **CIDR block**, gateway, and public NAT IP.
+### 💻 Virtual Hosts
+Create and manage simulated devices inside the private network.
+### 🔄 SNAT / PAT
+Simulate outbound traffic from private devices to the Internet.
+### 🔀 DNAT / Port Forwarding
+Forward incoming traffic from a public IP and port to a private device.
+### 📦 Packet Simulation
+Visualize how packets change during NAT processing.
+### 🔗 Connection Tracking
+Track active network connections and their translations.
+### 📊 NAT Table
+View the active NAT translation mappings.
+###  Linux Kernel Driver
+Includes an optional Linux character-device kernel module.
+---
+# 🔄SNAT / PAT
+When a private device sends traffic to the Internet, the NAT gateway translates its private address into a public address.
 
 Private Device
 192.168.1.10:50000
-        |
-        | SNAT / PAT
-        ↓
+        │
+        │  SNAT / PAT
+        ▼
 NAT Gateway
 203.0.113.5:<translated-port>
-        |
-        ↓
+        │
+        ▼
 Internet
 8.8.8.8:443
 
-The simulator creates and maintains the translation so that the response can return to the correct private device.
+The simulator maintains the translation so that the response can return to the correct private device.
 
 ⸻
 
-🔀 Port Forwarding — DNAT
+🔀 DNAT / Port Forwarding
 
-Port forwarding allows an Internet request to reach a private server.
-
-Example:
+Port forwarding allows incoming Internet traffic to reach a private device.
 
 Internet
-   |
-   | 203.0.113.5:8080
-   ↓
+   │
+   │ 203.0.113.5:8080
+   ▼
 NAT Gateway
-   |
-   | DNAT
-   ↓
+   │
+   │ DNAT
+   ▼
 192.168.1.20:80
-   |
-   ↓
+   │
+   ▼
 Private Server
 
-The simulator supports both TCP and UDP forwarding.
-
-Example rule:
+Example Rule
 
 203.0.113.5:8080
-        ↓
+        │
+        ▼
 192.168.1.20:80
+
+The simulator supports both TCP and UDP forwarding.
 
 ⸻
 
 📦 Packet Simulation
 
-The simulator shows how a packet changes during NAT processing.
+The simulator shows the packet before and after NAT processing.
 
 BEFORE
 203.0.113.5:8080
-        |
-        ↓
+        │
+        ▼
       DNAT
-        |
-        ↓
+        │
+        ▼
 AFTER
 192.168.1.20:80
 
@@ -94,7 +91,7 @@ This makes the NAT process easy to understand without using real network traffic
 
 🖥️ Interactive CLI
 
-Run the simulator and use the menu:
+The simulator provides a simple menu-driven interface:
 
 1. Configure Network
 2. Manage Virtual Hosts
@@ -110,56 +107,56 @@ Run the simulator and use the menu:
 
 ⸻
 
-🛠️ Technology Used
+🏗️ Architecture
 
-* C++20
-* C
-* CMake
-* Make
-* Linux Kernel Module
-* Linux Character Device
-* CLI-based Interface
+                    CLI
+                     │
+                     ▼
+            Simulation Service
+                     │
+          ┌──────────┴──────────┐
+          ▼                     ▼
+      NAT Engine        Connection Tracker
+          │
+     ┌────┴─────┐
+     ▼          ▼
+  SNAT/PAT     DNAT
+     │          │
+     └────┬─────┘
+          ▼
+   Packet Processing
+          │
+          ▼
+   Driver Interface
+          │
+          ▼
+ Linux Character Device
 
 ⸻
 
-🏗️ Simple Architecture
+🛠️ Technology Stack
 
-                CLI
-                 |
-                 ↓
-        Simulation Service
-                 |
-        ┌────────┴────────┐
-        ↓                 ↓
-    NAT Engine      Connection Tracker
-        |
-   ┌────┴─────┐
-   ↓          ↓
- SNAT/PAT    DNAT
-   |          |
-   └────┬─────┘
-        ↓
-   Packet Processing
-        |
-        ↓
- Driver Interface
-        |
-        ↓
- Linux Character Device
+Technology	Purpose
+C++20	Main simulator
+C	Linux kernel module
+CMake	Build system
+Make	Driver/build support
+Linux Kernel	Device driver
+CLI	User interface
 
 ⸻
 
 🐧 Linux Kernel Driver
 
-The project also includes a Linux kernel module that demonstrates communication between the C++ simulator and the Linux kernel.
+The project includes an optional Linux character-device kernel module.
 
 C++ Simulator
-      |
-      | ioctl / read / write
-      ↓
+      │
+      │ ioctl / read / write
+      ▼
 /dev/vns_control
-      |
-      ↓
+      │
+      ▼
 Linux Kernel Module
 
 The kernel module is Linux-specific.
@@ -170,17 +167,17 @@ The main simulator can run without the driver. Driver functionality requires a L
 
 🧪 Testing
 
-The project includes 7 test suites covering:
+The project contains 7 test suites covering:
 
 * Network configuration
 * NAT
 * PAT
-* DNAT
+* DNAT / Port Forwarding
 * Packet processing
 * Connection tracking
 * Driver interface
 
-Run the tests:
+Run all tests:
 
 cd build
 ctest --output-on-failure
@@ -189,19 +186,19 @@ ctest --output-on-failure
 
 ▶️ How to Run
 
-Build
+1. Build
 
 ./scripts/build.sh
 
-Start
+2. Start
 
 ./build/vns_sim
 
-Help
+3. Help
 
 ./build/vns_sim --help
 
-Version
+4. Version
 
 ./build/vns_sim --version
 
@@ -210,12 +207,14 @@ Version
 📁 Project Structure
 
 vns_new/
+│
 ├── include/        # Header files
 ├── src/            # C++ source code
 ├── tests/          # Test suites
 ├── scripts/        # Build and run scripts
 ├── kernel/         # Linux kernel module
-├── docs/           # Project documentation
+├── docs/           # Documentation
+│
 ├── CMakeLists.txt
 ├── Makefile
 └── README.md
@@ -231,21 +230,36 @@ vns_new/
 
 ⸻
 
-📌 Project Status
-
-The project demonstrates the complete simulated flow:
+🎯 Project Flow
 
 Virtual Network
-      ↓
-NAT Gateway
-      ↓
-SNAT / PAT
-      ↓
-DNAT / Port Forwarding
-      ↓
-Packet Transformation
-      ↓
-Connection Tracking
+       │
+       ▼
+ NAT Gateway
+       │
+       ├──────────────┐
+       ▼              ▼
+   SNAT / PAT       DNAT
+       │              │
+       └──────┬───────┘
+              ▼
+      Packet Processing
+              │
+              ▼
+     Connection Tracking
+              │
+              ▼
+         NAT Table
+
+⸻
+
+📌 Project Status
+
+The simulator demonstrates the complete Virtual NAT Gateway and Port Forwarding workflow using C++20.
+
+The project provides:
+
+Virtual Network → NAT/PAT → DNAT/Port Forwarding → Packet Transformation → Connection Tracking
 
 The simulator uses in-memory state and does not require a database, root privileges, or real network traffic.
 
@@ -255,4 +269,5 @@ The simulator uses in-memory state and does not require a database, root privile
 
 Virtual NAT Gateway & Port Forwarding Simulator
 
-Built using C++20 with Linux Kernel Driver Support.
+Built with C++20 + Linux Kernel Driver Support
+**clear large headings, smaller subheadings, bold keywords, tables, and code blocks**, instead of looking like one continuous block of identical text.
