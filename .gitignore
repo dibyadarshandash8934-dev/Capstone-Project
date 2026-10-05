@@ -1,0 +1,89 @@
+# Build artifacts
+build/
+dist/
+*.o
+*.so
+*.a
+*.ko
+*.mod.c
+*.mod.o
+*.symvers
+*.order
+modules.order
+Module.symvers
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyc
+.venv/
+venv/
+env/
+.env
+*.egg-info/
+.pytest_cache/
+.coverage
+coverage_report/
+htmlcov/
+.tox/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+dist/
+dist-ssr/
+*.local
+.vite/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.sublime-workspace
+*.sublime-project
+.vs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.out
+*.exe
+*.test
+*.log
+
+# Kernel module build
+kernel/vns_control/*.o
+kernel/vns_control/*.ko
+kernel/vns_control/*.mod.c
+kernel/vns_control/.*.cmd
+kernel/vns_control/Module.symvers
+kernel/vns_control/modules.order
+kernel/vns_control/modules.builtin
+kernel/vns_control/.tmp_versions/
+
+# IDE config
+*.sublime-workspace
+*.sublime-project
+
+# Test artifacts
+*.gcda
+*.gcno
+coverage.info
+coverage_report/
+
+# Local config
+.env
+.env.local
+*.local
