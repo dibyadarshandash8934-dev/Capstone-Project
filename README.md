@@ -1,355 +1,258 @@
-# Virtual NAT and Port Forward Simulator (C++)
+Virtual NAT Gateway & Port Forwarding Simulator
 
-A self-contained, interactive simulator of a **virtual NAT gateway**: it
-performs SNAT/PAT address translation, DNAT (port forwarding), connection
-tracking and per-packet transformation tracing, and exposes everything through a
-CLI.
+A simple C++20-based Virtual NAT Gateway Simulator that demonstrates how NAT works in a private network.
 
-The whole simulator runs in user space with in-memory state — no database, no
-network access and no root privileges required. The optional Linux kernel module
-(`kernel/vns_control/`) is only needed for driver-statistics demos.
+The project simulates SNAT/PAT, DNAT, Port Forwarding, Packet Processing, Connection Tracking, and NAT Tables through an interactive CLI.
 
----
+Note: This is a simulation. It does not send or intercept real network packets.
 
-## Requirements
+⸻
 
-| Tool                    | Version                             |
-| ----------------------- | ----------------------------------- |
-| CMake                   | 3.16+                               |
-| C++ compiler with C++20 | GCC 11+, Clang 14+, Apple Clang 14+ |
-| Make                    | any                                 |
+🚀 Main Features
 
-Optional (Linux only): kernel headers matching the running kernel, to build the
-`vns_control` module.
+* 🌐 Virtual Network Configuration
+* 💻 Virtual Host Management
+* 🔄 SNAT / PAT
+* 🔀 DNAT / Port Forwarding
+* 📦 Packet Simulation
+* 🔗 Connection Tracking
+* 📊 NAT Translation Table
+* 📈 Simulation Metrics
+* 🖥️ Interactive CLI
+* 🐧 Linux Kernel Driver Interface
 
-macOS and Linux both build and run the simulator; only the kernel module is
-Linux-specific.
+⸻
 
----
+🔄 How NAT Works
 
-## Quick start
+Outbound Traffic — SNAT/PAT
 
-```bash
-./scripts/build.sh            # configure + build (Release)
-cd build
-./vns_sim                     # interactive menu
-```
+A private device sends a packet to the Internet:
 
-Or with plain CMake:
+Private Device
+192.168.1.10:50000
+        |
+        | SNAT / PAT
+        ↓
+NAT Gateway
+203.0.113.5:<translated-port>
+        |
+        ↓
+Internet
+8.8.8.8:443
 
-```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
-./build/vns_sim
-```
+The simulator creates and maintains the translation so that the response can return to the correct private device.
 
-### Command-line options
+⸻
 
-```
-vns_sim -h | --help          show usage
-vns_sim --version            print the version
-vns_sim --driver-stats       print kernel driver statistics (needs the module)
-```
+🔀 Port Forwarding — DNAT
 
----
+Port forwarding allows an Internet request to reach a private server.
 
-## Running the tests
+Example:
 
-```bash
-cd build
-ctest --output-on-failure     # runs every suite
-./vns_tests                   # runner that executes all 7 suites in order
-```
+Internet
+   |
+   | 203.0.113.5:8080
+   ↓
+NAT Gateway
+   |
+   | DNAT
+   ↓
+192.168.1.20:80
+   |
+   ↓
+Private Server
 
-The individual suites are separate binaries:
+The simulator supports both TCP and UDP forwarding.
 
-| Binary                  | Covers                                                        |
-| ----------------------- | ------------------------------------------------------------- |
-| `test_network`          | IPv4 addresses, CIDR, network config, virtual devices         |
-| `test_nat`              | SNAT/PAT, reverse NAT, DNAT, NAT table, metrics               |
-| `test_pat`              | Public port allocator (allocate / release / exhaust / reset)  |
-| `test_dnat`             | Port-forwarding rules: add, duplicate, delete, TCP vs UDP     |
-| `test_packet`           | Packet model, flow keys, `to_string`/`from_string` round trip |
-| `test_connection`       | Connection tracker: create, dedupe, activity, expiry          |
-| `test_driver_interface` | Driver ioctl wrappers (graceful if module not loaded)         |
+Example rule:
 
-Each test file is a plain `main()` with `assert()` — no external test framework.
-To add one: create `tests/test_yourthing.cpp`, then add `yourthing` to
-`VNS_TEST_NAMES` in `CMakeLists.txt`.
-
----
-
-## Project layout
-
-```
-vns_new/
-├── CMakeLists.txt          # builds libvns_core, vns_sim, and the test suites
-├── include/vns/            # public headers
-│   ├── common/             # Ipv4Address helpers, VnsStats, metrics, error types
-│   ├── network/            # Ipv4Address, Cidr, NetworkConfig, VirtualDevice
-│   ├── nat/                # NatTable, PatAllocator, PortForwarding, NatEngine
-│   ├── packet/             # Packet, PacketEngine
-│   ├── connection/         # Connection, ConnectionTracker
-│   ├── driver/             # DriverInterface (ioctl wrapper)
-│   ├── services/           # SimulationService (wires engine + devices together)
-│   └── cli/                # Cli menu + console formatter
-├── src/                    # implementations, mirroring include/vns/
-├── tests/                  # one assert-based suite per area
-├── scripts/                # build.sh, run.sh, clean.sh, driver helpers
-├── kernel/vns_control/     # optional Linux kernel module
-└── docs/                   # architecture, networking, driver, testing, demo guide
-```
-
----
-
-## What the simulator does
-
-- **SNAT / PAT** — LAN packets get a public address and a port from a
-  configurable pool (default `40000-50000`); identical flows reuse the mapping.
-- **Reverse NAT** — responses from the Internet are matched against the reverse
-  flow key and translated back to the originating host and port.
-- **DNAT / port forwarding** — inbound packets to a forwarded public port are
-  rewritten to the private host:port; TCP and UDP rules are independent and
-  validated (public IP must be the gateway's, private IP must be a known LAN
-  device, no duplicate matches).
-- **Connection tracking** — every translated flow is tracked with activity
-  timestamps and an expiry timeout.
-- **Transformation tracing** — every packet produces an ordered list of steps
-  (`ORIGINAL` → `SNAT`/`DNAT` → `FORWARD`) plus before/after packets, which the
-  CLI prints.
-- **Metrics** — totals, successes, failures, per-action counts and average
-  processing time.
-
-State lives in memory only: `Reset Simulation` (menu 10) or restarting the
-process returns everything to its initial state.
-
----
-
-## Port Forwarding Simulator
-
-### What it is
-
-The **Port Forwarding Simulator** is the DNAT (Destination NAT) half of VNS. It
-lets you define rules that map a port on the gateway's public IP to a port on a
-host inside the private LAN, and then simulate the traffic that flows through
-those rules. Everything runs in user space against the in-memory
-`PortForwardingImpl` rule list owned by `NatEngineImpl` — no real network, no
-root, no configuration files.
-
-### Purpose
-
-A private LAN is normally unreachable from the Internet because its hosts use
-RFC 1918 addresses and the gateway only translates *outgoing* traffic
-(SNAT/PAT). Port forwarding solves this for one service at a time: instead of
-exposing the whole LAN, you publish exactly one public port and let the gateway
-rewrite the destination of any inbound packet that matches it.
-
-### How it works
-
-A rule is just a match and a rewrite. The match key is
-`(protocol, public IP, public port)` and the rewrite target is
-`(private IP, private port)`:
-
-```text
-Public IP:Port
-      ↓
-Port Forwarding Rule
-      ↓
-Private IP:Port
-```
-
-Realistic example — a web server on the LAN published on public port 8080:
-
-```text
 203.0.113.5:8080
         ↓
 192.168.1.20:80
-```
 
-An Internet client sends `TCP 198.51.100.7:51515 -> 203.0.113.5:8080`. The
-gateway finds the matching rule, rewrites only the destination, and forwards
-`TCP 198.51.100.7:51515 -> 192.168.1.20:80` to the LAN host.
+⸻
 
-### DNAT flow in the simulator
+📦 Packet Simulation
 
-`Simulate Inbound Packet` (menu 7) runs this path
-(`NatEngineImpl::process_incoming_packet`):
+The simulator shows how a packet changes during NAT processing.
 
-1. `ORIGINAL` — record the packet as received from the Internet.
-2. Look up a **rule** whose match key equals `(protocol, destination IP,
-   destination port)`. Disabled rules are skipped.
-3. `DNAT` — rewrite the destination to the rule's private IP and private port.
-   If no rule matches, the DNAT step fails and the gateway falls back to the
-   reverse-NAT path for the packet.
-4. Record a NAT entry (`private <-> public`, state `ACTIVE`) and register the
-   flow with the connection tracker.
-5. `FORWARD` — deliver the translated packet to the LAN device and count a
-   success in the metrics.
+BEFORE
+203.0.113.5:8080
+        |
+        ↓
+      DNAT
+        |
+        ↓
+AFTER
+192.168.1.20:80
 
-The return direction is handled by the same rule: an outgoing packet whose
-source is exactly the rule's private IP and private port reuses the rule's
-public port instead of taking a port from the PAT pool.
+This makes the NAT process easy to understand without using real network traffic.
 
-### Supported capabilities
+⸻
 
-| Capability                     | Behaviour                                                                                  |
-| ------------------------------ | ------------------------------------------------------------------------------------------ |
-| Protocols                      | `TCP` and `UDP`; rules of different protocols are independent                                |
-| Public IP                      | Always the gateway's public IP from menu 1 — a rule cannot point anywhere else             |
-| Private IP                     | Must be inside the LAN CIDR **and** must already exist as a virtual host (menu 2)            |
-| Ports                          | Prompted as `1-65535`; a zero port is rejected (`Invalid parameters.`)                      |
-| Duplicate rules                | Rejected — two enabled rules may not share the same protocol + public IP + public port      |
-| Rule identity                  | `<PROTOCOL>-<public IP>-<public port>`, e.g. `TCP-203.0.113.5-8080`                        |
-| Validation errors              | Surfaced by the CLI as `Invalid parameters.` or `Failed to add rule (conflict or invalid device?).` |
-| Visibility                     | `List Rules` table with `Status` (`ENABLED`/`DISABLED`), `View NAT Table`, `View Connections`|
-| Observability                  | Per-packet transformation trace plus `DNAT Packets` in the statistics                       |
-| Lifecycle                      | `Add Rule`, `List Rules`, `Delete Rule`; cleared by `Reset Simulation` (menu 10)             |
+🖥️ Interactive CLI
 
-### Relation to DNAT and NAT
+Run the simulator and use the menu:
 
-Port forwarding *is* DNAT in this project — `include/vns/nat/dnat.hpp` documents
-that DNAT is implemented as port-forwarding rules, so there is no separate DNAT
-code path. It is the mirror image of SNAT/PAT:
+1. Configure Network
+2. Manage Virtual Hosts
+3. Configure NAT
+4. View NAT Table
+5. Manage Port Forwarding
+6. Simulate Outbound Packet
+7. Simulate Inbound Packet
+8. View Connections
+9. View Driver Statistics
+10. Reset Simulation
+0. Exit
 
-| Direction                     | Feature       | Reads / writes                |
-| ----------------------------- | ------------- | ----------------------------- |
-| LAN → Internet                | SNAT / PAT    | private IP:port → public IP:allocated port |
-| Internet → LAN                | DNAT          | public IP:rule port → private host IP:rule port |
-| Internet → LAN (established)  | Reverse NAT   | NAT table reverse flow lookup |
+⸻
 
-Rules and the NAT table are independent: clearing the NAT table (menu 3 → 2)
-removes mappings but keeps port-forwarding rules, and deleting a rule does not
-clear the table.
+🛠️ Technology Used
 
-### Configuring a rule from the CLI
+* C++20
+* C
+* CMake
+* Make
+* Linux Kernel Module
+* Linux Character Device
+* CLI-based Interface
 
-1. `1` **Configure Network** — enter CIDR, gateway IP and public NAT IP.
-2. `2` **Manage Virtual Hosts** → `1` **Add Device** — add the private host that
-   will receive the traffic (its IP is required by the rule validation).
-3. `5` **Manage Port Forwarding** → `1` **Add Rule**, then answer the prompts:
+⸻
 
-```text
-Add Port Forwarding Rule
-Protocol (TCP/UDP) [TCP]: TCP
-Public Port (1-65535): 8080
-Private IP: 192.168.1.20
-Private Port (1-65535): 80
-Port forwarding rule added!
-```
+🏗️ Simple Architecture
 
-The public IP is taken from the network configuration, so it is not asked for.
-Then use `2` **List Rules** to display the table and `3` **Delete Rule** to remove
-one by its ID.
+                CLI
+                 |
+                 ↓
+        Simulation Service
+                 |
+        ┌────────┴────────┐
+        ↓                 ↓
+    NAT Engine      Connection Tracker
+        |
+   ┌────┴─────┐
+   ↓          ↓
+ SNAT/PAT    DNAT
+   |          |
+   └────┬─────┘
+        ↓
+   Packet Processing
+        |
+        ↓
+ Driver Interface
+        |
+        ↓
+ Linux Character Device
 
-### Running and testing
+⸻
 
-```bash
-./scripts/build.sh                        # build
-./build/vns_sim                           # interactive menu, then use 5 and 7
-./scripts/run.sh                          # build if needed, then start the CLI
-./scripts/run.sh --test                   # ctest + all 7 suites
-cd build && ctest --output-on-failure     # every suite
-./build/test_dnat                         # port-forwarding / DNAT suite only
-./build/test_nat                          # also covers DNAT and the reply path
-```
+🐧 Linux Kernel Driver
 
-### Example output
+The project also includes a Linux kernel module that demonstrates communication between the C++ simulator and the Linux kernel.
 
-Listing the rule created above (`5` → `2`):
+C++ Simulator
+      |
+      | ioctl / read / write
+      ↓
+/dev/vns_control
+      |
+      ↓
+Linux Kernel Module
 
-```text
-============================================================
-  PORT FORWARDING RULES
-============================================================
-ID                   | Protocol | Public                 | Private                | Status
----------------------+----------+------------------------+------------------------+---------
-TCP-203.0.113.5-8080 | TCP      | 203.0.113.5:8080       | 192.168.1.20:80        | ENABLED
-```
+The kernel module is Linux-specific.
 
-Simulating an inbound packet (`7`):
+The main simulator can run without the driver. Driver functionality requires a Linux system with the appropriate kernel headers.
 
-```text
-============================================================
-  PACKET SIMULATION RESULT
-============================================================
-Action: DNAT
+⸻
 
-  BEFORE NAT:
-    TCP 198.51.100.7:51515 -> 203.0.113.5:8080
+🧪 Testing
 
-  AFTER NAT:
-    TCP 198.51.100.7:51515 -> 192.168.1.20:80
+The project includes 7 test suites covering:
 
-  TRANSFORMATION STEPS:
-    Incoming packet from Internet
-    DNAT: 203.0.113.5:8080 -> 192.168.1.20:80
-    Packet forwarded to LAN device
+* Network configuration
+* NAT
+* PAT
+* DNAT
+* Packet processing
+* Connection tracking
+* Driver interface
 
-  NAT ENTRY:
-    TCP 192.168.1.20:80 <-> 203.0.113.5:8080 dest 198.51.100.7:51515 [ACTIVE]
-```
+Run the tests:
 
-The reverse direction (`6`, packet from the LAN host on the forwarded port):
+cd build
+ctest --output-on-failure
 
-```text
-Action: SNAT
+⸻
 
-  BEFORE NAT:
-    TCP 192.168.1.20:80 -> 198.51.100.7:443
+▶️ How to Run
 
-  AFTER NAT:
-    TCP 203.0.113.5:8080 -> 198.51.100.7:443
+Build
 
-  TRANSFORMATION STEPS:
-    Original packet from LAN device
-    SNAT: 192.168.1.20:80 -> 203.0.113.5:8080
-    Packet forwarded to Internet
-```
+./scripts/build.sh
 
-An inbound packet to a port with no rule and no NAT mapping is rejected:
+Start
 
-```text
-  FAILED: No active NAT mapping for incoming packet
-```
+./build/vns_sim
 
----
+Help
 
-## Optional: kernel module (Linux only)
+./build/vns_sim --help
 
-```bash
-cd kernel/vns_control
-make                     # requires kernel headers for the running kernel
-sudo insmod vns_control.ko
-./build/vns_sim --driver-stats
-sudo rmmod vns_control
-```
+Version
 
-Without the module the simulator runs normally and reports
-`Driver not available` for driver-specific menu entries.
+./build/vns_sim --version
 
----
+⸻
 
-## Scripts
+📁 Project Structure
 
-```bash
-./scripts/build.sh [clean|debug|release]   # configure and build
-./scripts/run.sh --help                    # list all options
-./scripts/run.sh                           # build if needed, then run the CLI
-./scripts/run.sh --test                    # ctest + full test runner
-./scripts/run.sh --driver-stats            # driver statistics
-./scripts/clean.sh                         # remove build artifacts
-```
+vns_new/
+├── include/        # Header files
+├── src/            # C++ source code
+├── tests/          # Test suites
+├── scripts/        # Build and run scripts
+├── kernel/         # Linux kernel module
+├── docs/           # Project documentation
+├── CMakeLists.txt
+├── Makefile
+└── README.md
 
----
+⸻
 
-## Documentation
+📋 Requirements
 
-| File                    | Contents                                      |
-| ----------------------- | --------------------------------------------- |
-| `docs/architecture.md`  | Module boundaries and data flow               |
-| `docs/networking.md`    | NAT/PAT/DNAT behaviour as implemented         |
-| `docs/testing.md`       | Test suite layout and how to extend it        |
-| `docs/device-driver.md` | ioctl interface of the kernel module          |
-| `docs/demo-guide.md`    | Guided walkthrough of a demo session          |
-| `docs/build-and-run.md` | Detailed build, run and troubleshooting steps |
-# Capstone-Project
+* CMake 3.16+
+* C++20 compiler
+* Make
+* Linux kernel headers for the kernel module
+
+⸻
+
+📌 Project Status
+
+The project demonstrates the complete simulated flow:
+
+Virtual Network
+      ↓
+NAT Gateway
+      ↓
+SNAT / PAT
+      ↓
+DNAT / Port Forwarding
+      ↓
+Packet Transformation
+      ↓
+Connection Tracking
+
+The simulator uses in-memory state and does not require a database, root privileges, or real network traffic.
+
+⸻
+
+👨‍💻 Project
+
+Virtual NAT Gateway & Port Forwarding Simulator
+
+Built using C++20 with Linux Kernel Driver Support.
